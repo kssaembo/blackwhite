@@ -1,0 +1,3 @@
+import { useEffect } from 'react';
+import { Html5Qrcode } from 'html5-qrcode';
+export function QRScanner({onCode,onClose}:{onCode:(code:string)=>void;onClose:()=>void}){useEffect(()=>{const q=new Html5Qrcode('qr-reader');q.start({facingMode:'environment'},{fps:8,qrbox:{width:220,height:220}},(text)=>{const code=text.replace(/^BWJOIN:/,'').trim().toUpperCase();onCode(code);q.stop().catch(()=>{});},()=>{}).catch(()=>{});return()=>{q.stop().catch(()=>{});};},[onCode]);return <div className="modal-back"><div className="modal"><h2>QR 코드 스캔</h2><div id="qr-reader"/><button className="secondary" onClick={onClose}>닫기</button></div></div>}
