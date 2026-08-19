@@ -66,7 +66,6 @@ export class AudioManager {
       case 'tileSelect': this.synth([760, 980], .08, .045, 'triangle'); break;
       case 'tileSubmit': this.synth([210, 150], .14, .075, 'square'); break;
       case 'opponentSubmit': this.synth([430, 610], .12, .055, 'sine'); break;
-      case 'roundLose': this.synth([240, 185], .24, .065, 'sawtooth'); break;
       case 'roundDraw': this.synth([390, 390], .16, .05, 'triangle'); break;
       case 'nextRound': this.synth([520, 680], .09, .035, 'sine'); break;
       case 'gameLose': this.synth([250, 190, 140], .28, .06, 'triangle'); break;
