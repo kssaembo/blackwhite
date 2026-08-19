@@ -77,3 +77,13 @@ Output directory: `dist`
 - Teacher page: student access QR/link, class timer, intro slides, teacher-only BGM, six-digit record collection code, live result table
 - Student page: confirmed/locked player name, prominent match-history button, record submission to teacher over temporary PeerJS/WebRTC connection
 - Record submission contains wins/losses/points and opponent-by-opponent match records. No central game database is used.
+
+## v7 수학 교과 연계 모드
+- 방장이 게임 유형과 난이도를 선택합니다.
+- 유형: 기본 숫자 / 분수 / 소수 / 길이 / 분수+소수(고학년 추천)
+- 난이도: 쉬움 / 보통 / 어려움
+- 기본 숫자 외 모드는 매 Match마다 새 타일 값이 생성됩니다.
+- 참가자는 방 참가 전에 유형/난이도를 확인합니다.
+- 동일 Match의 양 플레이어는 동일한 tileSet을 WebRTC로 공유합니다.
+- 최초 타일 순서는 무작위이며 각 플레이어는 자신의 기기에서만 드래그 정렬합니다.
+- 전적에는 게임 유형/난이도가 Match별로 기록되어 교사 집계에 함께 전송됩니다.
