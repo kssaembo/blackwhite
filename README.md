@@ -70,3 +70,10 @@ Output directory: `dist`
 4. 26대 / 13경기
 
 학교망에서 PeerJS signaling 또는 WebRTC ICE가 차단되면 signaling 계층만 교체할 수 있도록 게임 엔진·저장소와 분리되어 있습니다.
+
+## v5 classroom update
+- Main entrance: Teacher game / Student game / Game manual
+- Match codes: six numeric digits
+- Teacher page: student access QR/link, class timer, intro slides, teacher-only BGM, six-digit record collection code, live result table
+- Student page: confirmed/locked player name, prominent match-history button, record submission to teacher over temporary PeerJS/WebRTC connection
+- Record submission contains wins/losses/points and opponent-by-opponent match records. No central game database is used.

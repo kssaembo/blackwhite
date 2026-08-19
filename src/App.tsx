@@ -8,18 +8,21 @@ import { freshMatch, nextRound, resolveRound, startSet, useTile } from './game/g
 import { tileColor } from './game/rules';
 import { msg, type GameMessage } from './network/messageProtocol';
 import { PeerTransport, type NetStatus } from './network/peerConnection';
-import { AudioManager, TeacherBgmController } from './audio/AudioManager';
+import { AudioManager } from './audio/AudioManager';
+import { TeacherPortal } from './components/TeacherPortal';
+import { GameGuide } from './components/GameGuide';
+import { RecordSubmitModal } from './components/RecordSubmitModal';
 import { clearCurrent, getProfile, getRecord, resetRecord, saveCurrent, saveProfile, saveResult } from './storage/storage';
 import type { MatchState, PlayerRecord, Profile, Result, Tile } from './types';
 import './styles.css';
 
-const newMatchId=()=>`BW-${Math.random().toString(36).slice(2,7).toUpperCase()}`;
+const newMatchId=()=>String(Math.floor(100000+Math.random()*900000));
 const resultText=(r:Result)=>r==='WIN'?'WIN':r==='LOSE'?'LOSE':'DRAW';
 
 export default function App(){
   const [profile,setProfile]=useState<Profile>(()=>getProfile());
   const [record,setRecord]=useState<PlayerRecord>(()=>getRecord());
-  const [screen,setScreen]=useState<'HOME'|'CREATE'|'JOIN'|'GAME'|'RECORD'|'TEACHER'>(()=>location.hash==='#teacher'?'TEACHER':'HOME');
+  const [screen,setScreen]=useState<'LANDING'|'HOME'|'CREATE'|'JOIN'|'GAME'|'RECORD'|'TEACHER'|'GUIDE'>(()=>location.hash==='#teacher'?'TEACHER':location.hash==='#student'?'HOME':'LANDING');
   const [match,setMatch]=useState<MatchState|null>(null);
   const matchRef=useRef<MatchState|null>(null);
   const applyMatch=useCallback((next:MatchState|null)=>{matchRef.current=next;setMatch(next)},[]);
@@ -35,9 +38,8 @@ export default function App(){
   const processed=useRef(new Set<string>());
   const continueGuard=useRef(false);
   const audio=useMemo(()=>new AudioManager(),[]);
-  const teacherBgm=useMemo(()=>new TeacherBgmController(),[]);
-  const [bgmPlaying,setBgmPlaying]=useState(false);
-  const [bgmVolume,setBgmVolume]=useState(.45);
+  const [nameLocked,setNameLocked]=useState(()=>Boolean(getProfile().name.trim()));
+  const [submitOpen,setSubmitOpen]=useState(false);
 
   useEffect(()=>{if(match)saveCurrent(match)},[match]);
   useEffect(()=>()=>transportRef.current.close(),[]);
@@ -100,9 +102,10 @@ export default function App(){
 
   useEffect(()=>{const t=transportRef.current;let previous:NetStatus='idle';t.onMessage=processMessage;t.onStatus=(st)=>{setNetStatus(st);if((st==='disconnected'||st==='error')&&previous==='connected')audio.play('connectionLost');if(st==='connected'&&(previous==='disconnected'||previous==='error'||previous==='connecting'))audio.play('connectionRestored');previous=st;const s=matchRef.current;if(st==='connected'&&s){send(msg('HELLO',s.matchId,sessionId,s.set,s.round,{playerId:s.playerId,playerName:s.playerName}));}};},[processMessage,send,sessionId,audio]);
 
-  const updateName=(name:string)=>{const p={...profile,name};setProfile(p);saveProfile(p)};
+  const updateName=(name:string)=>{if(nameLocked)return;setProfile({...profile,name})};
+  const confirmName=()=>{const name=profile.name.trim();if(!name){setNotice('이름 또는 별명을 입력하세요.');return;}const p={...profile,name};setProfile(p);saveProfile(p);setNameLocked(true);setNotice(`${name} 플레이어로 확정되었습니다.`)};
   const createGame=()=>{if(!profile.name.trim()){setNotice('먼저 이름을 입력하세요.');return;}const id=newMatchId();const s=freshMatch({matchId:id,role:'HOST',playerId:profile.id,playerName:profile.name,opponentId:'',opponentName:''});applyMatch(s);setScreen('CREATE');transportRef.current.host(id);};
-  const joinGame=(code=joinCode)=>{const clean=code.trim().toUpperCase();if(!profile.name.trim()){setNotice('먼저 이름을 입력하세요.');return;}if(!/^BW-[A-Z0-9]{5}$/.test(clean)){setNotice('게임 코드를 확인하세요. 예: BW-K7F2X');return;}const s=freshMatch({matchId:clean,role:'JOIN',playerId:profile.id,playerName:profile.name,opponentId:'',opponentName:''});applyMatch(s);setScreen('GAME');transportRef.current.join(clean);};
+  const joinGame=(code=joinCode)=>{const raw=code.startsWith('BWJOIN:')?code.slice(7):code;const clean=raw.replace(/\D/g,'').slice(0,6);if(!profile.name.trim()){setNotice('먼저 이름을 입력하세요.');return;}if(!/^\d{6}$/.test(clean)){setNotice('게임 코드는 6자리 숫자입니다.');return;}const s=freshMatch({matchId:clean,role:'JOIN',playerId:profile.id,playerName:profile.name,opponentId:'',opponentName:''});applyMatch(s);setScreen('GAME');transportRef.current.join(clean);};
   const ready=()=>{if(!match)return;const updated={...match,myReady:true,phase:'READY' as const};applyMatch(updated);send(msg('READY',updated.matchId,sessionId,updated.set,updated.round,{ready:true}));if(updated.role==='HOST'&&updated.opponentReady){const first=Math.random()<.5?updated.playerId:updated.opponentId;send(msg('MATCH_START',updated.matchId,sessionId,1,1,{firstPlayerId:first}));audio.play('gameStart');applyMatch(startSet(updated,first,1));}};
 
   const submitTile=async()=>{
@@ -121,17 +124,17 @@ export default function App(){
   const leaveToHome=()=>{transportRef.current.close();clearCurrent();applyMatch(null);setSelected(undefined);setScreen('HOME');setNetStatus('idle');};
   const rematch=()=>{transportRef.current.close();clearCurrent();applyMatch(null);setSelected(undefined);setScreen('HOME');setNetStatus('idle');};
 
-  const toggleTeacherBgm=async()=>{audio.play('buttonClick');try{if(bgmPlaying){teacherBgm.pause();setBgmPlaying(false)}else{await teacherBgm.play();setBgmPlaying(true)}}catch{setNotice('브라우저에서 오디오 재생을 허용해주세요.')}};
-  const restartTeacherBgm=()=>{teacherBgm.restart();setBgmPlaying(true)};
-
   const phaseMessage=()=>{if(!match)return'';if(match.phase==='DISCONNECTED')return'연결이 끊어졌습니다. 게임 상태는 보존되었습니다.';if(match.phase==='READY'||match.phase==='CONNECTED')return'두 플레이어가 READY를 눌러주세요.';if(match.phase==='ROUND_START')return'상대가 먼저 타일을 냅니다.';if(match.phase==='FIRST_SELECTING')return'당신이 먼저 냅니다. 타일을 선택하세요.';if(match.phase==='FIRST_LOCKED')return'제출 완료. 상대방의 선택을 기다리고 있습니다.';if(match.phase==='SECOND_SELECTING')return`상대가 ${match.revealedOpponentColor}을 냈습니다. 타일을 선택하세요.`;if(match.phase==='SECOND_LOCKED')return'제출 완료. 상대의 타일을 검증하고 있습니다.';return'';};
   const last=match?.history.at(-1);
 
-  if(screen==='HOME') return <main className="shell home scene-main"><header className="brand image-brand"><img src="/assets/images/logo/logo_blackwhite.png" alt="백과 흑 - 더 지니어스 한 학급 놀이"/><div className="brand-rule"><span/>심리 추리 숫자 대결<span/></div></header><section className="record-card glass"><div><small>오늘의 전적</small><strong>{record.wins}승 <em>·</em> {record.losses}패</strong><span>총 {record.games}경기</span></div><div className="points"><small>승점</small><strong>{record.points}</strong></div></section><section className="name-box glass compact"><label>PLAYER NAME</label><input value={profile.name} maxLength={12} placeholder="이름 또는 별명" onChange={e=>updateName(e.target.value)}/></section><div className="home-actions"><button className="primary" onClick={()=>{audio.play('buttonClick');createGame()}}>게임 만들기</button><button className="light" onClick={()=>{audio.play('buttonClick');setScreen('JOIN')}}>게임 참가</button></div><div className="sub-actions"><button className="link" onClick={()=>setScreen('RECORD')}>내 경기 기록</button><button className="link teacher-link" onClick={()=>setScreen('TEACHER')}>교사용 BGM</button></div>{notice&&<div className="toast" onClick={()=>setNotice('')}>{notice}</div>}</main>;
+  if(screen==='LANDING') return <main className="shell home landing-home scene-main"><header className="brand image-brand"><img src="/assets/images/logo/logo_blackwhite.png" alt="백과 흑 - 더 지니어스 한 학급 놀이"/><div className="brand-rule"><span/>심리 추리 숫자 대결<span/></div></header><div className="landing-actions"><button className="primary teacher-start" onClick={()=>{location.hash='teacher';setScreen('TEACHER')}}><small>수업 운영 · 타이머 · 결과 집계</small>교사 게임 시작</button><button className="light student-start" onClick={()=>{location.hash='student';setScreen('HOME')}}><small>2인 연결 · 대결 · 개인 전적</small>학생 게임 시작</button><button className="manual-start" onClick={()=>setScreen('GUIDE')}><small>교사/학생 사용 방법</small>게임 설명서</button></div></main>;
 
-  if(screen==='TEACHER') return <main className="shell center scene-lobby"><button className="back" onClick={()=>setScreen('HOME')}>← 학생 화면</button><div className="panel teacher-console glass"><div className="eyebrow">TEACHER AUDIO CONSOLE</div><h2>게임 운영 BGM</h2><p className="muted">교사 PC 또는 전자칠판 한 대에서만 재생하세요. 제공된 메인 BGM을 반복 재생합니다.</p><div className="teacher-disc"><div className={`disc-core ${bgmPlaying?'playing':''}`}>B&W</div></div><div className="teacher-controls"><button className="primary" onClick={toggleTeacherBgm}>{bgmPlaying?'일시정지':'BGM 재생'}</button><button className="secondary" onClick={restartTeacherBgm}>처음부터 재생</button></div><label className="volume-control"><span>볼륨</span><input type="range" min="0" max="1" step="0.01" value={bgmVolume} onChange={e=>{const v=Number(e.target.value);setBgmVolume(v);teacherBgm.setVolume(v)}}/><b>{Math.round(bgmVolume*100)}%</b></label><div className="teacher-note"><b>운영 권장</b><span>학생 READY 완료 → BGM 재생 → 경기 종료 후 일시정지</span></div></div>{notice&&<div className="toast" onClick={()=>setNotice('')}>{notice}</div>}</main>;
+  if(screen==='GUIDE') return <GameGuide onBack={()=>setScreen('LANDING')}/>;
+  if(screen==='TEACHER') return <TeacherPortal onBack={()=>{location.hash='';setScreen('LANDING')}}/>;
 
-  if(screen==='JOIN') return <main className="shell center scene-lobby"><button className="back" onClick={()=>setScreen('HOME')}>← 돌아가기</button><div className="panel join"><div className="eyebrow">JOIN MATCH</div><h2>게임 참가</h2><button className="scan" onClick={()=>setScanner(true)}>▣ QR 코드 스캔</button><div className="or"><span/>또는<span/></div><label>게임 코드</label><input className="code-input" value={joinCode} onChange={e=>setJoinCode(e.target.value.toUpperCase())} placeholder="BW-K7F2X"/><button className="primary" onClick={()=>joinGame()}>입장</button></div>{scanner&&<QRScanner onCode={(c)=>{setScanner(false);setJoinCode(c);joinGame(c)}} onClose={()=>setScanner(false)}/>} {notice&&<div className="toast" onClick={()=>setNotice('')}>{notice}</div>}</main>;
+  if(screen==='HOME') return <main className="shell home scene-main student-home"><button className="back home-back" onClick={()=>{location.hash='';setScreen('LANDING')}}>← 메인 화면</button><header className="brand image-brand"><img src="/assets/images/logo/logo_blackwhite.png" alt="백과 흑"/><div className="brand-rule"><span/>STUDENT GAME<span/></div></header><section className="record-card glass"><div><small>오늘의 전적</small><strong>{record.wins}승 <em>·</em> {record.losses}패</strong><span>총 {record.games}경기</span></div><div className="points"><small>승점</small><strong>{record.points}</strong></div></section><section className={`name-box glass compact ${nameLocked?'locked':''}`}><label>PLAYER NAME</label><div className="name-confirm-row"><input value={profile.name} disabled={nameLocked} maxLength={12} placeholder="이름 또는 별명" onChange={e=>updateName(e.target.value)}/>{!nameLocked?<button className="name-confirm" onClick={confirmName}>확인</button>:<><span className="fixed-badge">✓ 플레이어 확정</span><button className="name-edit" onClick={()=>setNameLocked(false)}>이름 변경</button></>}</div></section><div className="home-actions"><button className="primary" disabled={!nameLocked} onClick={()=>{audio.play('buttonClick');createGame()}}>게임 만들기</button><button className="light" disabled={!nameLocked} onClick={()=>{audio.play('buttonClick');setScreen('JOIN')}}>게임 참가</button></div><div className="student-record-actions"><button className="record-main-btn" onClick={()=>setScreen('RECORD')}>▤ 내 경기 기록 <b>{record.games}</b></button><button className="submit-record-btn" disabled={!nameLocked} onClick={()=>setSubmitOpen(true)}>↑ 전적 제출</button></div>{!nameLocked&&<p className="name-help">게임을 시작하려면 이름을 입력하고 <b>확인</b>을 눌러 플레이어를 확정하세요.</p>}{submitOpen&&<RecordSubmitModal profile={profile} record={record} onClose={()=>setSubmitOpen(false)} onDone={setNotice}/>} {notice&&<div className="toast" onClick={()=>setNotice('')}>{notice}</div>}</main>;
+
+  if(screen==='JOIN') return <main className="shell center scene-lobby"><button className="back" onClick={()=>setScreen('HOME')}>← 돌아가기</button><div className="panel join"><div className="eyebrow">JOIN MATCH</div><h2>게임 참가</h2><button className="scan" onClick={()=>setScanner(true)}>▣ QR 코드 스캔</button><div className="or"><span/>또는<span/></div><label>게임 코드</label><input className="code-input" inputMode="numeric" maxLength={6} value={joinCode} onChange={e=>setJoinCode(e.target.value.replace(/\D/g,'').slice(0,6))} placeholder="000000"/><button className="primary" onClick={()=>joinGame()}>입장</button></div>{scanner&&<QRScanner onCode={(c)=>{setScanner(false);setJoinCode(c);joinGame(c)}} onClose={()=>setScanner(false)}/>} {notice&&<div className="toast" onClick={()=>setNotice('')}>{notice}</div>}</main>;
 
   if(screen==='CREATE'&&match) return <main className="shell center scene-lobby"><button className="back" onClick={leaveToHome}>← 취소</button><div className="panel create"><div className="eyebrow">CREATE MATCH</div><h2>상대방에게 보여주세요</h2><div className="qr"><QRCodeSVG value={`BWJOIN:${match.matchId}`} size={220} level="M"/></div><div className="match-code">{match.matchId}</div><div className={`connection ${netStatus}`}><span/> {netStatus==='connected'?'상대 연결됨':'상대방을 기다리는 중...'}</div>{netStatus==='connected'&&<button className="primary" onClick={()=>setScreen('GAME')}>READY 화면으로</button>}</div></main>;
 
