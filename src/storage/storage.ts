@@ -10,3 +10,5 @@ export function resetRecord(){const r=emptyRecord();localStorage.setItem(RECORD,
 export function saveCurrent(s:MatchState){localStorage.setItem(CURRENT,JSON.stringify(s));}
 export function getCurrent():MatchState|null{const v=localStorage.getItem(CURRENT);return v?JSON.parse(v):null;}
 export function clearCurrent(){localStorage.removeItem(CURRENT);}
+
+export function resetAccount(){localStorage.removeItem(PROFILE);localStorage.removeItem(RECORD);localStorage.removeItem(CURRENT);const p={id:crypto.randomUUID(),name:''};localStorage.setItem(PROFILE,JSON.stringify(p));const r=emptyRecord();localStorage.setItem(RECORD,JSON.stringify(r));return {profile:p,record:r};}
