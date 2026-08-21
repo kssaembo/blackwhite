@@ -14,16 +14,18 @@ export interface TileSpec {
   valueNum: number;
   valueDen: number;
 }
-export interface RoundRecord { set:number; round:number; myTile:Tile; myColor:TileColor; opponentColor:TileColor; result:Result; }
+export interface RoundRecord { set:number; round:number; myTile:Tile; opponentTile?:Tile; myColor:TileColor; opponentColor:TileColor; result:Result; }
 export interface DeductionState { marks:Record<number,Mark>; memo:string; }
+export interface RecordSummary { wins:number; draws:number; losses:number; games:number; points:number; }
 export interface MatchState {
   matchId:string; role:Role; playerId:string; playerName:string; opponentId:string; opponentName:string;
+  opponentRecord?:RecordSummary;
   gameType:GameType; difficulty:Difficulty; tileSet:TileSpec[]; tileOrder:Tile[];
   set:number; round:number; myScore:number; opponentScore:number; firstPlayerId:string; phase:Phase;
   myRemainingTiles:Tile[]; myUsedTiles:Tile[]; opponentUsedColors:TileColor[]; history:RoundRecord[];
   deduction:DeductionState; pendingMyTile?:Tile; pendingOpponentTile?:Tile; pendingCommitHash?:string; pendingNonce?:string;
   revealedOpponentColor?:TileColor; myReady:boolean; opponentReady:boolean; myContinue:boolean; opponentContinue:boolean;
 }
-export interface MatchRecord { matchId:string; opponentName:string; result:'WIN'|'LOSE'; playedAt:string; gameType:GameType; difficulty:Difficulty; }
-export interface PlayerRecord { recordDate:string; wins:number; losses:number; games:number; points:number; matches:MatchRecord[]; processedMatchIds:string[]; }
+export interface MatchRecord { matchId:string; opponentName:string; result:Result; playedAt:string; gameType:GameType; difficulty:Difficulty; }
+export interface PlayerRecord { recordDate:string; wins:number; draws:number; losses:number; games:number; points:number; matches:MatchRecord[]; processedMatchIds:string[]; }
 export interface Profile { id:string; name:string; }

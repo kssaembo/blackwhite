@@ -8,7 +8,7 @@ const val=(n:number,d:number)=>n/d;
 const shuffle=<T,>(arr:T[])=>{const a=[...arr];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a};
 const pick=<T,>(arr:T[])=>arr[Math.floor(Math.random()*arr.length)];
 
-export const gameTypeLabel=(t:GameType)=>({BASIC:'기본 숫자',FRACTION:'분수',DECIMAL:'소수',LENGTH:'길이',MIXED:'분수 + 소수'}[t]);
+export const gameTypeLabel=(t:GameType)=>({BASIC:'기본 숫자',FRACTION:'분수',DECIMAL:'소수',LENGTH:'단위',MIXED:'분수 + 소수'}[t]);
 export const difficultyLabel=(d:Difficulty)=>({EASY:'쉬움',NORMAL:'보통',HARD:'어려움'}[d]);
 
 interface Candidate {display:string;n:number;d:number}
@@ -19,12 +19,10 @@ function select(pool:Candidate[],count=9,minGap=0){
   if(out.length<count) throw new Error('타일 후보 생성 조건을 만족하지 못했습니다.');
   return out;
 }
-function colors(gameType:GameType):TileColor[]{
-  if(gameType==='BASIC')return ['WHITE','BLACK','WHITE','BLACK','WHITE','BLACK','WHITE','BLACK','WHITE'];
-  return shuffle<TileColor>(['BLACK','BLACK','BLACK','BLACK','BLACK','WHITE','WHITE','WHITE','WHITE']);
-}
-function make(gameType:GameType,candidates:Candidate[]):TileSpec[]{
-  const cs=colors(gameType);return candidates.map((c,i)=>({id:IDS[i],display:c.display,color:cs[i],valueNum:norm(c.n,c.d)[0],valueDen:norm(c.n,c.d)[1]}));
+function colors():TileColor[]{return ['WHITE','BLACK','WHITE','BLACK','WHITE','BLACK','WHITE','BLACK','WHITE'];}
+function make(_gameType:GameType,candidates:Candidate[]):TileSpec[]{
+  const ordered=[...candidates].sort((a,b)=>val(a.n,a.d)-val(b.n,b.d));
+  const cs=colors();return ordered.map((c,i)=>({id:IDS[i],display:c.display,color:cs[i],valueNum:norm(c.n,c.d)[0],valueDen:norm(c.n,c.d)[1]}));
 }
 
 function basic(_d:Difficulty){

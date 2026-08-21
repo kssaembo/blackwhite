@@ -1,7 +1,8 @@
-import type { Difficulty, GameType, Tile, TileColor, TileSpec } from '../types';
+import type { Difficulty, GameType, MatchState, RecordSummary, Tile, TileColor, TileSpec } from '../types';
 export type GameMessage =
- | Base<'HELLO',{playerId:string;playerName:string}>
+ | Base<'HELLO',{playerId:string;playerName:string;record:RecordSummary}>
  | Base<'ROOM_CONFIG',{gameType:GameType;difficulty:Difficulty;tileSet:TileSpec[]}>
+ | Base<'STATE_SYNC',{state:MatchState}>
  | Base<'READY',{ready:boolean}>
  | Base<'MATCH_START',{firstPlayerId:string}>
  | Base<'FIRST_COMMIT',{color:TileColor;commitHash:string}>
