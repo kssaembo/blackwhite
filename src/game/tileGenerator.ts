@@ -20,16 +20,16 @@ function select(pool:Candidate[],count=9,minGap=0){
   return out;
 }
 function colors(gameType:GameType):TileColor[]{
-  if(gameType==='BASIC')return ['BLACK','WHITE','BLACK','WHITE','BLACK','WHITE','BLACK','WHITE','BLACK'];
+  if(gameType==='BASIC')return ['WHITE','BLACK','WHITE','BLACK','WHITE','BLACK','WHITE','BLACK','WHITE'];
   return shuffle<TileColor>(['BLACK','BLACK','BLACK','BLACK','BLACK','WHITE','WHITE','WHITE','WHITE']);
 }
 function make(gameType:GameType,candidates:Candidate[]):TileSpec[]{
   const cs=colors(gameType);return candidates.map((c,i)=>({id:IDS[i],display:c.display,color:cs[i],valueNum:norm(c.n,c.d)[0],valueDen:norm(c.n,c.d)[1]}));
 }
 
-function basic(d:Difficulty){
-  const sets:Record<Difficulty,number[]>={EASY:[0,1,2,3,4,5,6,7,8],NORMAL:[3,7,12,18,25,31,44,57,68],HARD:[8,15,27,39,54,73,91,120,146]};
-  return sets[d].map(n=>({display:String(n),n,d:1}));
+function basic(_d:Difficulty){
+  // 기본 숫자 모드는 원형 게임 규칙을 위한 고정 0~8 세트이며 난이도를 사용하지 않는다.
+  return [0,1,2,3,4,5,6,7,8].map(n=>({display:String(n),n,d:1}));
 }
 function fraction(d:Difficulty):Candidate[]{
   if(d==='EASY'){
