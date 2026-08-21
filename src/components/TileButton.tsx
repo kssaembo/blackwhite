@@ -3,6 +3,8 @@ import type { Tile, TileSpec } from '../types';
 
 type DragVisual={x:number;y:number;w:number;h:number;dx:number;dy:number}|null;
 function TileText({display}:{display:string}){
+  const frac=display.match(/^(\d+)\/(\d+)$/);
+  if(frac)return <span className="tile-text fraction-text"><b>{frac[1]}</b><i/><b>{frac[2]}</b></span>;
   const m=display.match(/^([0-9.]+)\s*(mm|cm|m|km)$/i);
   if(m)return <span className="tile-text length-text"><b>{m[1]}</b><small>{m[2]}</small></span>;
   return <span className={`tile-text ${display.length>=6?'small':''}`}>{display}</span>;

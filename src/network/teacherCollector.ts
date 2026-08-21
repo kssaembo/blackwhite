@@ -48,7 +48,7 @@ export class TeacherCollector {
 
 export async function submitRecordToTeacher(code:string, profile:Profile, record:PlayerRecord):Promise<void>{
   const clean=code.replace(/\D/g,'');
-  if(!/^\d{6}$/.test(clean)) throw new Error('교사 코드는 6자리 숫자입니다.');
+  if(!/^\d{4}$/.test(clean)) throw new Error('교사 코드는 4자리 숫자입니다.');
   return new Promise((resolve,reject)=>{
     const peer=new Peer();
     const timeout=window.setTimeout(()=>{try{peer.destroy()}catch{};reject(new Error('교사 페이지에 연결할 수 없습니다. 교사 코드와 집계 대기 상태를 확인하세요.'));},8000);

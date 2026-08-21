@@ -6,7 +6,7 @@ const cleanCode=(text:string)=>text.replace(/^BWJOIN:/,'').replace(/^BWREC:/,'')
 export function QRScanner({onCode,onClose}:{onCode:(code:string)=>void;onClose:()=>void}){
   const videoRef=useRef<HTMLVideoElement|null>(null);const [error,setError]=useState('');const [mode,setMode]=useState<'native'|'fallback'>('native');
   useEffect(()=>{let stopped=false;let stream:MediaStream|undefined;let timer=0;let fallback:Html5Qrcode|undefined;
-    const finish=(text:string)=>{const code=cleanCode(text);if(/^\d{6}$/.test(code)&&!stopped){stopped=true;onCode(code)}};
+    const finish=(text:string)=>{const code=cleanCode(text);if(/^\d{4}$/.test(code)&&!stopped){stopped=true;onCode(code)}};
     const startFallback=async()=>{setMode('fallback');try{fallback=new Html5Qrcode('qr-reader-fallback');const cams=await Html5Qrcode.getCameras();if(!cams.length)throw new Error('카메라를 찾을 수 없습니다.');const rear=cams.find(c=>/back|rear|environment|후면/i.test(c.label))??cams[cams.length-1];await fallback.start(rear.id,{fps:8,qrbox:{width:230,height:230}},finish,()=>{});}catch(e){setError(e instanceof Error?e.message:'QR 카메라를 시작하지 못했습니다.')}};
     const start=async()=>{try{
       if(!window.BarcodeDetector){await startFallback();return;}
