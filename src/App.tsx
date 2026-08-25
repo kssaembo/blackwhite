@@ -57,6 +57,8 @@ export default function App(){
   const [dragTile,setDragTile]=useState<Tile|undefined>();
   const dragMoved=useRef(false);
   const [recoveryCode,setRecoveryCode]=useState('');
+  const [roomReady,setRoomReady]=useState(false);
+  const [reopenRoomOpen,setReopenRoomOpen]=useState(false);
   const lastPeerActivity=useRef(Date.now());
 
   useEffect(()=>{if(match)saveCurrent(match)},[match]);
@@ -147,11 +149,28 @@ export default function App(){
 
   const updateName=(name:string)=>{if(!nameLocked)setProfile({...profile,name})};
   const confirmName=()=>{const name=profile.name.trim();if(!name){setNotice('이름 또는 별명을 입력하세요.');return;}const p={...profile,name};setProfile(p);saveProfile(p);setNameLocked(true);setNotice(`${name} 플레이어로 확정되었습니다.`)};
+  const openHostRoom=useCallback(async(base:MatchState,discardedCode='')=>{
+    setRoomReady(false);setNetStatus('connecting');processed.current.clear();
+    const tried=new Set<string>(discardedCode?[discardedCode]:[]);
+    for(let attempt=0;attempt<8;attempt++){
+      let id=newMatchId();while(tried.has(id))id=newMatchId();tried.add(id);
+      const next={...base,matchId:id};applyMatch(next);
+      try{await transportRef.current.host(id);setRoomReady(true);return;}
+      catch{transportRef.current.close();}
+    }
+    setNetStatus('error');setNotice('게임방을 열지 못했습니다. 방 다시 열기를 눌러 재시도하세요.');
+  },[applyMatch]);
   const createGame=(gameType:GameType,difficulty:Difficulty)=>{
     if(!profile.name.trim()){setNotice('먼저 이름을 입력하세요.');return;}
     const id=newMatchId(),tileSet=generateTileSet(gameType,difficulty);
     const s=freshMatch({matchId:id,role:'HOST',playerId:profile.id,playerName:profile.name,opponentId:'',opponentName:'',gameType,difficulty,tileSet});
-    applyMatch(s);setCreateOpen(false);setScreen('CREATE');transportRef.current.host(id);
+    applyMatch(s);setCreateOpen(false);setScreen('CREATE');void openHostRoom(s);
+  };
+  const reopenRoom=()=>{
+    const current=matchRef.current;if(!current)return;
+    const reset=freshMatch({matchId:current.matchId,role:'HOST',playerId:current.playerId,playerName:current.playerName,opponentId:'',opponentName:'',gameType:current.gameType,difficulty:current.difficulty,tileSet:current.tileSet});
+    reset.tileOrder=[...current.tileOrder];
+    setReopenRoomOpen(false);void openHostRoom(reset,current.matchId);
   };
   const joinGame=useCallback((code=joinCode)=>{
     const raw=code.replace(/^BWJOIN:/,'').replace(/^BWREC:/,'').split(':')[0],clean=raw.replace(/\D/g,'').slice(0,4);
@@ -194,7 +213,7 @@ export default function App(){
 
   if(screen==='PREVIEW'&&match)return <main className="shell center scene-lobby"><button className="back" onClick={leaveToHome}>← 참가 취소</button><div className="panel room-preview"><div className="eyebrow">ROOM FOUND</div><h2>게임방을 찾았습니다</h2><div className="preview-host">방장 <b>{match.opponentName||'확인 중'}</b><small className="opponent-record-preview">{recordLine(match.opponentRecord)}</small></div><div className="room-config-card"><span>게임 유형<strong>{gameTypeLabel(match.gameType)}</strong></span><span>난이도<strong>{match.gameType==='BASIC'?'없음':difficultyLabel(match.difficulty)}</strong></span></div>{match.gameType==='BASIC'&&<div className="basic-rule-note">백 0·2·4·6·8 / 흑 1·3·5·7</div>}{match.gameType==='MIXED'&&<div className="grade-badge">고학년 추천 모드</div>}<p>참가하면 방장과 동일한 9개의 타일을 사용합니다.</p><button className="primary" onClick={()=>setScreen('GAME')}>이 게임에 참가하기</button></div></main>;
 
-  if(screen==='CREATE'&&match)return <main className="shell center scene-lobby"><button className="back" onClick={leaveToHome}>← 취소</button><div className="panel create"><div className="eyebrow">CREATE MATCH</div><h2>상대방에게 보여주세요</h2><div className="room-config-inline"><b>{gameTypeLabel(match.gameType)}</b>{match.gameType!=='BASIC'&&<><span>·</span><b>{difficultyLabel(match.difficulty)}</b></>}</div>{match.gameType==='BASIC'&&<div className="basic-rule-note">백 0·2·4·6·8 / 흑 1·3·5·7</div>}<div className="qr"><QRCodeSVG value={`BWJOIN:${match.matchId}`} size={220} level="M"/></div><div className="match-code">{match.matchId}</div><div className={`connection ${netStatus}`}><span/> {netStatus==='connected'?'상대 연결됨':'상대방을 기다리는 중...'}</div>{netStatus==='connected'&&<button className="primary" onClick={()=>setScreen('GAME')}>READY 화면으로</button>}</div></main>;
+  if(screen==='CREATE'&&match)return <main className="shell center scene-lobby"><button className="back" onClick={leaveToHome}>← 취소</button><div className="panel create"><div className="eyebrow">CREATE MATCH</div><button className="reopen-room-btn" disabled={!roomReady&&netStatus!=='error'} onClick={()=>{audio.play('buttonClick');setReopenRoomOpen(true)}}>↻ 방 다시 열기</button><h2>{roomReady?'상대방에게 보여주세요':'게임방을 준비하고 있습니다...'}</h2><div className="room-config-inline"><b>{gameTypeLabel(match.gameType)}</b>{match.gameType!=='BASIC'&&<><span>·</span><b>{difficultyLabel(match.difficulty)}</b></>}</div>{match.gameType==='BASIC'&&<div className="basic-rule-note">백 0·2·4·6·8 / 흑 1·3·5·7</div>}{roomReady?<><div className="qr"><QRCodeSVG value={`BWJOIN:${match.matchId}`} size={220} level="M"/></div><div className="match-code">{match.matchId}</div><div className={`connection ${netStatus}`}><span/> {netStatus==='connected'?'상대 연결됨':'상대방을 기다리는 중...'}</div>{netStatus==='connected'&&<button className="primary" onClick={()=>setScreen('GAME')}>READY 화면으로</button>}</>:<div className={`room-preparing ${netStatus==='error'?'error':''}`}><span/>{netStatus==='error'?'게임방을 열지 못했습니다.':'연결 코드를 안전하게 발급하는 중...'}</div>}</div>{reopenRoomOpen&&<div className="modal-back"><div className="modal game-confirm-modal"><span className="eyebrow">REOPEN MATCH</span><h2>게임방을 다시 열까요?</h2><p>현재 코드 <b>{match.matchId}</b>는 폐기되고 새로운 4자리 연결 코드가 발급됩니다.</p><p>선택한 게임 유형, 난이도와 타일 세트는 그대로 유지됩니다.</p><div className="modal-actions"><button className="secondary" onClick={()=>setReopenRoomOpen(false)}>취소</button><button className="primary" onClick={()=>{audio.play('buttonClick');reopenRoom()}}>새 코드 만들기</button></div></div></div>}</main>;
 
   if(screen==='RECORD')return <main className="shell records scene-main"><button className="back" onClick={()=>setScreen('HOME')}>← 돌아가기</button><div className="panel"><div className="eyebrow">MY RECORD</div><h2>내 경기 기록</h2><div className="record-summary"><strong>{record.games}경기</strong><span>{record.wins}승 · {record.draws}무 · {record.losses}패 · 승점 {record.points}</span></div><div className="history-list">{record.matches.length===0?<p className="muted">아직 경기 기록이 없습니다.</p>:record.matches.map((m,i)=><div className="history-item" key={m.matchId}><b>{record.matches.length-i}경기</b><span>{m.opponentName}<small>{gameTypeLabel(m.gameType??'BASIC')} · {m.gameType==='BASIC'?'난이도 없음':difficultyLabel(m.difficulty??'EASY')}</small></span><strong className={m.result.toLowerCase()}>{resultKo(m.result)}</strong></div>)}</div></div></main>;
 
